@@ -1,0 +1,57 @@
+CROSS_HOST="x86_64-w64-mingw32"
+inherit cross
+
+NAME="mingw64-x86_64-cfitsio"
+VERSION=3.360
+RELEASE=1
+CATEGORY="Devel"
+SUMMARY="FITS data parser library for Win64 toolchain"
+DESCRIPTION="CFITSIO is a library of C and Fortran subroutines for reading and
+writing data files in FITS (Flexible Image Transport System) data format.
+CFITSIO provides simple high-level routines for reading and writing FITS files
+that insulate the programmer from the internal complexities of the FITS format.
+CFITSIO also provides many advanced features for manipulating and filtering
+the information in FITS files."
+HOMEPAGE="http://heasarc.gsfc.nasa.gov/fitsio/"
+SRC_URI="ftp://heasarc.gsfc.nasa.gov/software/fitsio/c/cfitsio${VERSION//.}.tar.gz"
+SRC_DIR="cfitsio"
+
+PATCH_URI="
+	http://pkgs.fedoraproject.org/cgit/cfitsio.git/plain/cfitsio-noversioncheck.patch
+	http://pkgs.fedoraproject.org/cgit/cfitsio.git/plain/cfitsio-pkgconfig.patch
+	http://pkgs.fedoraproject.org/cgit/cfitsio.git/plain/cfitsio-zlib.patch
+"
+
+src_compile() {
+	cd ${S}
+	cygautoreconf
+	lndirs
+	cd ${B}
+	cygconf
+	cygmake clean all
+	verbose ${CC} -shared ${LDFLAGS} -Wl,--out-implib,libcfitsio.dll.a \
+		-o libcfitsio-${VERSION%%.*}.dll \
+		-Wl,--whole-archive libcfitsio.a -Wl,--no-whole-archive \
+		-lz || error "DLL link failed"
+}
+
+src_test() {
+	local t="testprog speed cookbook"
+	cd ${B}
+	cygmake ${t}
+	for x in ${t}
+	do
+		PATH="${CROSS_BINDIR}:.:${PATH}" \
+		./${x} || true
+	done
+}
+
+src_install() {
+	cd ${B}
+	dobin libcfitsio-${VERSION%%.*}.dll
+	dolib libcfitsio.a libcfitsio.dll.a
+	includeinto cfitsio
+	doinclude fitsio.h fitsio2.h longnam.h drvrsmem.h
+	dopkgconfig cfitsio.pc
+}
+DOCS="License.txt"
